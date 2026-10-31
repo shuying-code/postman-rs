@@ -1,0 +1,9 @@
+{
+  "id": "e0000000-0000-4000-8000-000000000001",
+  "name": "Demo Environment",
+  "_postman_variable_scope": "environment",
+  "values": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:7878", "type": "default", "enabled": true },
+    { "key": "token", "value": "demo-token", "type": "secret", "enabled": true }
+  ]
+}

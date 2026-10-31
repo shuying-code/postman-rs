@@ -1,0 +1,13 @@
+# Rust build output
+/target
+
+# Local artifacts / packaging output
+/dist
+
+# Scratch / logs
+/work
+*.log
+
+# OS cruft
+.DS_Store
+Thumbs.db

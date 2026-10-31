@@ -1,0 +1,58 @@
+{
+  "info": {
+    "name": "Demo Collection",
+    "_postman_id": "d3f1a8b0-0000-4000-8000-000000000001",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "A tiny demo collection used by postman-rs (point baseUrl at a local server)."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:7878" }
+  ],
+  "item": [
+    {
+      "name": "Get Hello",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{baseUrl}}/hello" },
+        "header": [
+          { "key": "Accept", "value": "text/plain" }
+        ],
+        "tests": [
+          { "type": "body_contains", "value": "hello" }
+        ]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": ["pm.test('ok', () => pm.response.to.have.status(200));"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create User",
+      "request": {
+        "method": "POST",
+        "url": { "raw": "{{baseUrl}}/users" },
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":\"{{$randomFirstName}}\"}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{token}}" }]
+        },
+        "tests": [
+          { "type": "status", "equals": 201 },
+          { "type": "json_path", "path": "ok", "equals": true }
+        ]
+      }
+    }
+  ]
+}

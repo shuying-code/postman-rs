@@ -1,0 +1,4 @@
+# Produce a fully self-contained Windows executable: statically link the
+# MSVC CRT (vcruntime + UCRT) so no Visual C++ Redistributable is required.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
