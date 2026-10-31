@@ -1081,7 +1081,44 @@ struct GuiApp {
     cookie_new_kv: String,
     /// 控制台日志（请求/响应/脚本）
     console: Vec<String>,
+    /// 待确认的删除/破坏性操作（确认弹窗）
+    pending_delete: Option<PendingDelete>,
+    /// 新建请求对话框状态
+    new_req_dialog: bool,
+    new_req_name: String,
+    new_req_method: String,
 }
+
+/// 需要二次确认的删除/破坏性操作。
+#[derive(Clone)]
+enum PendingDelete {
+    Collection { name: String },
+    TreeItem { path: Vec<usize>, name: String },
+    Tab { idx: usize, title: String },
+    EnvVar { idx: usize, key: String },
+    GlobalVar { idx: usize, key: String },
+}
+
+impl PendingDelete {
+    fn description(&self) -> String {
+        match self {
+            PendingDelete::Collection { name } => format!("确定删除集合「{}」？此操作不可恢复。", name),
+            PendingDelete::TreeItem { name, .. } => {
+                format!("确定删除请求/文件夹「{}」？此操作不可恢复。", name)
+            }
+            PendingDelete::Tab { title, .. } => format!("确定关闭标签「{}」？未保存的改动将丢失。", title),
+            PendingDelete::EnvVar { key, .. } => format!(
+                "确定删除环境变量「{}」？确认后记得点“保存环境”。",
+                if key.trim().is_empty() { "(空键)" } else { key }
+            ),
+            PendingDelete::GlobalVar { key, .. } => format!(
+                "确定删除全局变量「{}」？确认后记得点“保存全局变量”。",
+                if key.trim().is_empty() { "(空键)" } else { key }
+            ),
+        }
+    }
+}
+
 impl GuiApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         install_fonts(&cc.egui_ctx);
@@ -1147,6 +1184,10 @@ impl GuiApp {
             cookie_new_host: String::new(),
             cookie_new_kv: String::new(),
             console: Vec::new(),
+            pending_delete: None,
+            new_req_dialog: false,
+            new_req_name: String::new(),
+            new_req_method: "GET".into(),
         };
         app.refresh_all();
         app
@@ -1740,7 +1781,264 @@ impl GuiApp {
             Err(e) => self.codegen_out = format!("生成失败：{}", e),
         }
     }
+    /// 把当前代码生成结果（如 cURL）保存为文件。
+    fn save_codegen_to_file(&mut self) {
+        let req = self.tabs[self.active].build_request();
+        let code = match codegen::generate(&req, &self.codegen_lang) {
+            Ok(c) => c,
+            Err(e) => {
+                self.message = format!("生成失败：{}", e);
+                return;
+            }
+        };
+        self.codegen_out = code.clone();
+        let dir = storage::home().join("exports");
+        let _ = std::fs::create_dir_all(&dir);
+        let ext = match self.codegen_lang.as_str() {
+            "curl" => "sh",
+            "python" => "py",
+            "js" | "nodejs" => "js",
+            "go" => "go",
+            "rust" => "rs",
+            "java" => "java",
+            "csharp" => "cs",
+            "php" => "php",
+            "ruby" => "rb",
+            "powershell" => "ps1",
+            "swift" => "swift",
+            _ => "txt",
+        };
+        let path = dir.join(format!(
+            "{}_{}.{}",
+            self.codegen_lang,
+            chrono::Local::now().format("%Y%m%d_%H%M%S"),
+            ext
+        ));
+        match std::fs::write(&path, code.as_bytes()) {
+            Ok(_) => self.message = format!("已导出 {} → {}", self.codegen_lang, path.display()),
+            Err(e) => self.message = format!("导出失败：{}", e),
+        }
+    }
     // ---- 顶部栏 -----------------------------------------------------------
+    /// 按方法给出默认请求头（创建请求时使用）。
+    fn default_headers_for(method: &str) -> Vec<HeaderRow> {
+        let m = method.to_uppercase();
+        let mut rows = Vec::new();
+        if matches!(m.as_str(), "POST" | "PUT" | "PATCH" | "DELETE") {
+            rows.push(HeaderRow {
+                key: "Content-Type".into(),
+                value: "application/json".into(),
+                disabled: false,
+            });
+        }
+        rows.push(HeaderRow {
+            key: "Accept".into(),
+            value: "application/json".into(),
+            disabled: false,
+        });
+        rows.push(HeaderRow::default());
+        rows
+    }
+
+    /// 打开“新建请求”对话框。
+    fn open_new_request_dialog(&mut self) {
+        let n = self.tabs.len() + 1;
+        self.new_req_name = format!("新建请求 {}", n);
+        self.new_req_method = "GET".into();
+        self.new_req_dialog = true;
+    }
+
+    /// 按对话框内容创建新请求标签。
+    fn create_request_from_dialog(&mut self) {
+        let mut tab = Tab::new(self.tabs.len() + 1);
+        let name = self.new_req_name.trim().to_string();
+        if !name.is_empty() {
+            tab.title = name;
+        }
+        let method = self.new_req_method.clone();
+        tab.method = method.clone();
+        tab.headers = Self::default_headers_for(&method);
+        if matches!(method.to_uppercase().as_str(), "POST" | "PUT" | "PATCH") {
+            tab.body_type = "json".into();
+        }
+        self.tabs.push(tab);
+        self.active = self.tabs.len() - 1;
+        self.new_req_dialog = false;
+    }
+
+    /// 新建请求对话框。
+    fn show_new_request_dialog(&mut self, ctx: &egui::Context) {
+        if !self.new_req_dialog {
+            return;
+        }
+        let mut create = false;
+        let mut cancel = false;
+        egui::Window::new("新建请求")
+            .order(egui::Order::Foreground)
+            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+            .collapsible(false)
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.set_min_width(360.0);
+                ui.add_space(4.0);
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("名称").color(text_secondary()).size(12.0));
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.new_req_name)
+                            .desired_width(250.0)
+                            .hint_text("请求名称（可修改）"),
+                    );
+                });
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("方法").color(text_secondary()).size(12.0));
+                    egui::ComboBox::from_id_salt("new_req_method")
+                        .width(120.0)
+                        .selected_text(
+                            RichText::new(&self.new_req_method)
+                                .color(method_color(&self.new_req_method))
+                                .strong(),
+                        )
+                        .show_ui(ui, |ui| {
+                            for m in [
+                                "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "COPY",
+                                "LINK", "UNLINK", "PURGE", "LOCK", "UNLOCK", "PROPFIND", "VIEW",
+                                "TRACE",
+                            ] {
+                                ui.selectable_value(
+                                    &mut self.new_req_method,
+                                    m.to_string(),
+                                    RichText::new(m).color(method_color(m)).strong(),
+                                );
+                            }
+                        });
+                    ui.label(
+                        RichText::new("POST/PUT/PATCH 自动带 Content-Type: application/json")
+                            .color(text_secondary())
+                            .size(10.5),
+                    );
+                });
+                ui.add_space(10.0);
+                ui.horizontal(|ui| {
+                    if ui
+                        .add(egui::Button::new(RichText::new("取消").color(text_secondary())))
+                        .clicked()
+                    {
+                        cancel = true;
+                    }
+                    if ui
+                        .add(
+                            egui::Button::new(RichText::new("创建").color(Color32::WHITE).strong())
+                                .fill(brand())
+                                .rounding(Rounding::same(6.0)),
+                        )
+                        .clicked()
+                    {
+                        create = true;
+                    }
+                });
+            });
+        if create {
+            self.create_request_from_dialog();
+        } else if cancel {
+            self.new_req_dialog = false;
+        }
+    }
+
+    fn apply_pending_delete(&mut self, pd: PendingDelete) {
+        match pd {
+            PendingDelete::Collection { .. } => self.delete_collection(),
+            PendingDelete::TreeItem { path, .. } => {
+                if let Some(c) = self.tree.as_mut() {
+                    remove_at(&mut c.item, &path);
+                }
+                self.save_tree();
+            }
+            PendingDelete::Tab { idx, .. } => {
+                if self.tabs.len() > 1 && idx < self.tabs.len() {
+                    self.tabs.remove(idx);
+                    if self.active >= self.tabs.len() {
+                        self.active = self.tabs.len() - 1;
+                    }
+                }
+            }
+            PendingDelete::EnvVar { idx, .. } => {
+                if idx < self.env_edit.len() {
+                    self.env_edit.remove(idx);
+                }
+            }
+            PendingDelete::GlobalVar { idx, .. } => {
+                if idx < self.globals_edit.len() {
+                    self.globals_edit.remove(idx);
+                }
+            }
+        }
+    }
+
+    /// 删除/关闭确认弹窗（含半透明遮罩，拦截背景点击）。
+    fn show_confirm_dialog(&mut self, ctx: &egui::Context) {
+        let Some(pd) = self.pending_delete.clone() else {
+            return;
+        };
+        let mut confirm = false;
+        let mut cancel = false;
+        let screen = ctx.screen_rect();
+        egui::Area::new(egui::Id::new("confirm_overlay"))
+            .order(egui::Order::Middle)
+            .fixed_pos(screen.min)
+            .show(ctx, |ui| {
+                let full = egui::Rect::from_min_size(screen.min, screen.size());
+                ui.painter()
+                    .rect_filled(full, 0.0, egui::Color32::from_black_alpha(110));
+                let resp = ui.allocate_rect(full, egui::Sense::click());
+                if resp.clicked() {
+                    cancel = true;
+                }
+            });
+        egui::Window::new("确认操作")
+            .order(egui::Order::Foreground)
+            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+            .collapsible(false)
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.set_min_width(320.0);
+                ui.add_space(4.0);
+                ui.label(
+                    RichText::new(pd.description())
+                        .color(text_primary())
+                        .size(12.5),
+                );
+                ui.add_space(10.0);
+                ui.horizontal(|ui| {
+                    if ui
+                        .add(
+                            egui::Button::new(RichText::new("取消").color(text_secondary()))
+                                .min_size(egui::vec2(84.0, 28.0)),
+                        )
+                        .clicked()
+                    {
+                        cancel = true;
+                    }
+                    if ui
+                        .add(
+                            egui::Button::new(RichText::new("确定").color(Color32::WHITE).strong())
+                                .fill(Color32::from_rgb(220, 38, 38))
+                                .rounding(Rounding::same(6.0))
+                                .min_size(egui::vec2(84.0, 28.0)),
+                        )
+                        .clicked()
+                    {
+                        confirm = true;
+                    }
+                });
+            });
+        if confirm {
+            self.apply_pending_delete(pd);
+            self.pending_delete = None;
+        } else if cancel {
+            self.pending_delete = None;
+        }
+    }
+
     fn ui_topbar(&mut self, ctx: &egui::Context) {
         let ctx2 = ctx.clone();
         egui::TopBottomPanel::top("topbar")
@@ -1965,7 +2263,12 @@ impl GuiApp {
             )
             .clicked()
         {
-            self.delete_collection();
+            let name = self
+                .coll_files
+                .get(self.coll_sel)
+                .map(|p| file_name(p))
+                .unwrap_or_else(|| "（当前集合）".into());
+            self.pending_delete = Some(PendingDelete::Collection { name });
         }
         ui.add_space(6.0);
         egui::Frame::none()
@@ -1999,7 +2302,7 @@ impl GuiApp {
             .unwrap_or_default();
         let ren = self.rename_path.clone();
         let mut clicked: Option<Vec<usize>> = None;
-        let mut del: Option<Vec<usize>> = None;
+        let mut del: Option<(Vec<usize>, String)> = None;
         let mut dup: Option<Vec<usize>> = None;
         let mut up: Option<Vec<usize>> = None;
         let mut down: Option<Vec<usize>> = None;
@@ -2097,18 +2400,15 @@ impl GuiApp {
                             )
                             .clicked()
                         {
-                            del = Some(row.path.clone());
+                            del = Some((row.path.clone(), row.name.clone()));
                         }
                     });
                     ui.add_space(1.0);
                 }
             });
         // ---- 应用树操作 ----
-        if let Some(p) = del {
-            if let Some(c) = self.tree.as_mut() {
-                remove_at(&mut c.item, &p);
-            }
-            self.save_tree();
+        if let Some((p, name)) = del {
+            self.pending_delete = Some(PendingDelete::TreeItem { path: p, name });
         }
         if let Some(p) = dup {
             self.duplicate_item(&p);
@@ -2371,37 +2671,45 @@ impl GuiApp {
             .auto_shrink([false, false])
             .max_height(320.0)
             .show(ui, |ui| {
-                let avail = ui.available_width();
-                let key_w = (avail * 0.42).clamp(80.0, 160.0);
-                let val_w = (avail - key_w - 30.0).clamp(90.0, 400.0);
-                egui::Grid::new("enveditgrid")
-                    .num_columns(3)
-                    .striped(true)
-                    .show(ui, |ui| {
-                        for (i, (k, v)) in self.env_edit.iter_mut().enumerate() {
-                            ui.add(
-                                egui::TextEdit::singleline(k).desired_width(key_w).hint_text("键"),
-                            );
-                            ui.add(
-                                egui::TextEdit::singleline(v)
-                                    .desired_width(val_w)
-                                    .hint_text("值"),
-                            );
-                            if ui
-                                .add(
-                                    egui::Button::new(RichText::new("×").color(text_secondary()))
-                                        .frame(false),
-                                )
-                                .clicked()
-                            {
-                                remove = Some(i);
-                            }
-                            ui.end_row();
+                // 键、值两个输入框各占左侧栏宽度的一半（用 columns(2) 在
+                // 「×按钮之前」的剩余区域内强制二等分）。
+                const ROW_H: f32 = 22.0;
+                for (i, (k, v)) in self.env_edit.iter_mut().enumerate() {
+                    ui.horizontal(|ui| {
+                        let rem = (ui.available_width() - 26.0).max(120.0);
+                        ui.allocate_ui_with_layout(
+                            egui::vec2(rem, ROW_H),
+                            egui::Layout::left_to_right(egui::Align::Center),
+                            |ui| {
+                                ui.columns(2, |cols| {
+                                    let w0 = cols[0].available_width();
+                                    cols[0].add_sized(
+                                        [w0, ROW_H],
+                                        egui::TextEdit::singleline(k).hint_text("键"),
+                                    );
+                                    let w1 = cols[1].available_width();
+                                    cols[1].add_sized(
+                                        [w1, ROW_H],
+                                        egui::TextEdit::singleline(v).hint_text("值"),
+                                    );
+                                });
+                            },
+                        );
+                        if ui
+                            .add(
+                                egui::Button::new(RichText::new("×").color(text_secondary()))
+                                    .frame(false),
+                            )
+                            .clicked()
+                        {
+                            remove = Some(i);
                         }
                     });
+                }
             });
         if let Some(i) = remove {
-            self.env_edit.remove(i);
+            let key = self.env_edit.get(i).map(|(k, _)| k.clone()).unwrap_or_default();
+            self.pending_delete = Some(PendingDelete::EnvVar { idx: i, key });
         }
         if ui
             .add(
@@ -2467,37 +2775,44 @@ impl GuiApp {
             .auto_shrink([false, false])
             .max_height(320.0)
             .show(ui, |ui| {
-                let avail = ui.available_width();
-                let key_w = (avail * 0.42).clamp(80.0, 160.0);
-                let val_w = (avail - key_w - 30.0).clamp(90.0, 400.0);
-                egui::Grid::new("globalseditgrid")
-                    .num_columns(3)
-                    .striped(true)
-                    .show(ui, |ui| {
-                        for (i, (k, v)) in self.globals_edit.iter_mut().enumerate() {
-                            ui.add(
-                                egui::TextEdit::singleline(k).desired_width(key_w).hint_text("键"),
-                            );
-                            ui.add(
-                                egui::TextEdit::singleline(v)
-                                    .desired_width(val_w)
-                                    .hint_text("值"),
-                            );
-                            if ui
-                                .add(
-                                    egui::Button::new(RichText::new("×").color(text_secondary()))
-                                        .frame(false),
-                                )
-                                .clicked()
-                            {
-                                remove = Some(i);
-                            }
-                            ui.end_row();
+                // 键、值两个输入框各占左侧栏宽度的一半（用 columns(2) 二等分）。
+                const ROW_H: f32 = 22.0;
+                for (i, (k, v)) in self.globals_edit.iter_mut().enumerate() {
+                    ui.horizontal(|ui| {
+                        let rem = (ui.available_width() - 26.0).max(120.0);
+                        ui.allocate_ui_with_layout(
+                            egui::vec2(rem, ROW_H),
+                            egui::Layout::left_to_right(egui::Align::Center),
+                            |ui| {
+                                ui.columns(2, |cols| {
+                                    let w0 = cols[0].available_width();
+                                    cols[0].add_sized(
+                                        [w0, ROW_H],
+                                        egui::TextEdit::singleline(k).hint_text("键"),
+                                    );
+                                    let w1 = cols[1].available_width();
+                                    cols[1].add_sized(
+                                        [w1, ROW_H],
+                                        egui::TextEdit::singleline(v).hint_text("值"),
+                                    );
+                                });
+                            },
+                        );
+                        if ui
+                            .add(
+                                egui::Button::new(RichText::new("×").color(text_secondary()))
+                                    .frame(false),
+                            )
+                            .clicked()
+                        {
+                            remove = Some(i);
                         }
                     });
+                }
             });
         if let Some(i) = remove {
-            self.globals_edit.remove(i);
+            let key = self.globals_edit.get(i).map(|(k, _)| k.clone()).unwrap_or_default();
+            self.pending_delete = Some(PendingDelete::GlobalVar { idx: i, key });
         }
         if ui
             .add(
@@ -2961,6 +3276,18 @@ impl GuiApp {
                     {
                         ui.output_mut(|o| o.copied_text = self.codegen_out.clone());
                     }
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new("保存为文件").color(text_secondary()),
+                            )
+                            .frame(false),
+                        )
+                        .on_hover_text("把生成的代码/命令保存到 ~/.postman-rs/exports/")
+                        .clicked()
+                    {
+                        self.save_codegen_to_file();
+                    }
                 });
                 if !self.codegen_out.is_empty() {
                     let mut ro = self.codegen_out.clone();
@@ -3376,16 +3703,14 @@ impl GuiApp {
         }
         if let Some(i) = close {
             if self.tabs.len() > 1 {
-                self.tabs.remove(i);
-                if self.active >= self.tabs.len() {
-                    self.active = self.tabs.len() - 1;
-                }
+                self.pending_delete = Some(PendingDelete::Tab {
+                    idx: i,
+                    title: self.tabs[i].title.clone(),
+                });
             }
         }
         if add {
-            let n = self.tabs.len() + 1;
-            self.tabs.push(Tab::new(n));
-            self.active = self.tabs.len() - 1;
+            self.open_new_request_dialog();
         }
     }
     fn ui_request_card(&mut self, ui: &mut egui::Ui) -> bool {
@@ -3413,7 +3738,7 @@ impl GuiApp {
                         );
                     }
                 });
-            let url_w = (ui.available_width() - 186.0).max(160.0);
+            let url_w = (ui.available_width() - 262.0).max(160.0);
             let resp = egui::Frame::none()
                 .fill(mix(bg_panel(), text_primary(), 0.04))
                 .rounding(Rounding::same(R_MD))
@@ -3445,6 +3770,28 @@ impl GuiApp {
                 let code = codegen::generate(&tab.build_request(), "curl").unwrap_or_default();
                 ui.output_mut(|o| o.copied_text = code);
                 tab.status = "已复制 cURL 到剪贴板".into();
+            }
+            if ui
+                .add(
+                    egui::Button::new(RichText::new("导出").color(brand()).strong())
+                        .fill(brand_soft())
+                        .rounding(Rounding::same(R_MD))
+                        .min_size(egui::vec2(56.0, 32.0)),
+                )
+                .on_hover_text("把当前请求导出为 cURL 脚本文件（~/.postman-rs/exports/）")
+                .clicked()
+            {
+                let code = codegen::generate(&tab.build_request(), "curl").unwrap_or_default();
+                let dir = storage::home().join("exports");
+                let _ = std::fs::create_dir_all(&dir);
+                let path = dir.join(format!(
+                    "curl_{}.sh",
+                    chrono::Local::now().format("%Y%m%d_%H%M%S")
+                ));
+                match std::fs::write(&path, code.as_bytes()) {
+                    Ok(_) => tab.status = format!("已导出 cURL → {}", path.display()),
+                    Err(e) => tab.status = format!("导出失败：{}", e),
+                }
             }
             let label = if tab.inflight { "发送中…" } else { "发送" };
             if ui
@@ -3806,16 +4153,12 @@ impl GuiApp {
         }
     }
     fn ui_headers(tab: &mut Tab, ui: &mut egui::Ui) {
-        // 键、值各占一半：用 ui.columns(2) 在「勾选框之后、×按钮之前」的
-        // 剩余区域内强制二等分，保证两者等宽且不溢出。
+        // 请求头以「键/值输入框」呈现（含默认请求头），不使用“启用”勾选框。
+        // 键、值各占一半：用 ui.columns(2) 在「×按钮之前」的剩余区域内强制二等分。
         const ROW_H: f32 = 22.0;
         const RESERVE_DEL: f32 = 26.0; // 预留给右侧「×」按钮
         // 表头
         ui.horizontal(|ui| {
-            ui.add_sized(
-                [24.0, 16.0],
-                egui::Label::new(RichText::new("启用").color(text_secondary()).size(11.0)),
-            );
             let rem = (ui.available_width() - RESERVE_DEL).max(120.0);
             ui.allocate_ui_with_layout(
                 egui::vec2(rem, 16.0),
@@ -3843,19 +4186,11 @@ impl GuiApp {
         ui.add_space(2.0);
         let mut remove: Option<usize> = None;
         for i in 0..tab.headers.len() {
-            let mut enabled = !tab.headers[i].disabled;
-            let mut chg = false;
             {
                 let h = &mut tab.headers[i];
                 let key = &mut h.key;
                 let value = &mut h.value;
                 ui.horizontal(|ui| {
-                    if ui
-                        .add_sized([24.0, ROW_H], egui::Checkbox::new(&mut enabled, ""))
-                        .changed()
-                    {
-                        chg = true;
-                    }
                     let rem = (ui.available_width() - RESERVE_DEL).max(120.0);
                     ui.allocate_ui_with_layout(
                         egui::vec2(rem, ROW_H),
@@ -3885,9 +4220,6 @@ impl GuiApp {
                         remove = Some(i);
                     }
                 });
-            }
-            if chg {
-                tab.headers[i].disabled = !enabled;
             }
         }
         if let Some(i) = remove {
@@ -4638,15 +4970,14 @@ impl eframe::App for GuiApp {
             )
         });
         if k_new {
-            let n = self.tabs.len() + 1;
-            self.tabs.push(Tab::new(n));
-            self.active = self.tabs.len() - 1;
+            self.open_new_request_dialog();
         }
         if k_close && self.tabs.len() > 1 {
-            self.tabs.remove(self.active);
-            if self.active >= self.tabs.len() {
-                self.active = self.tabs.len() - 1;
-            }
+            let idx = self.active;
+            self.pending_delete = Some(PendingDelete::Tab {
+                idx,
+                title: self.tabs[idx].title.clone(),
+            });
         }
         if k_save {
             self.save_active();
@@ -4728,6 +5059,8 @@ impl eframe::App for GuiApp {
         self.ui_topbar(ctx);
         self.ui_sidebar(ctx);
         self.ui_main(ctx);
+        self.show_new_request_dialog(ctx);
+        self.show_confirm_dialog(ctx);
     }
 }
 // ---------------------------------------------------------------------------

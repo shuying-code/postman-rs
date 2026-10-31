@@ -19,6 +19,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioning foll
 - **Extended HTTP method dropdown** (COPY/LINK/UNLINK/PURGE/LOCK/UNLOCK/PROPFIND/VIEW/TRACE).
 - **Container image (GHCR)**: `Dockerfile` + `.github/workflows/docker.yml` build and push the CLI
   image to GitHub Packages (`ghcr.io/zhouyulong123/postman-rs`).
+- **cURL 导出增强**：请求卡片新增「导出」按钮，代码生成面板新增「保存为文件」，可把当前请求
+  导出为 cURL/各语言文件到 `~/.postman-rs/exports/`（原有「复制 cURL」「从 cURL 导入」保留）。
+- **新建请求对话框**：新建标签时可命名并选择方法；`POST/PUT/PATCH` 自动带上默认请求头
+  （`Content-Type: application/json`、`Accept: application/json`）与 JSON 请求体。
+- **删除二次确认弹窗**：删除集合/请求/文件夹、关闭标签、删除环境/全局变量行前，均弹出确认框，
+  确认后才执行（带半透明遮罩，点击遮罩=取消）。
+- **环境/全局变量编辑**：键、值两个输入框各占左侧栏一半宽度；**请求头编辑**改为纯键/值输入框
+  呈现（移除“启用”勾选框），默认请求头同样以输入框显示。
 - `LICENSE-MIT`, `LICENSE-APACHE`, `CHANGELOG.md`, `.gitignore`.
 
 ### Fixed
