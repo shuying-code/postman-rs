@@ -2,7 +2,7 @@
 # Slim, reproducible image for the pmrs CLI.
 # Building only the `pmrs` binary keeps the image lean (the heavy GUI deps
 # such as eframe/egui are not reachable from this target and are skipped).
-FROM rust:1.82-slim AS builder
+FROM rust:1-slim AS builder
 WORKDIR /src
 COPY . .
 RUN cargo build --release --locked --bin pmrs
