@@ -27,6 +27,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioning foll
   确认后才执行（带半透明遮罩，点击遮罩=取消）。
 - **环境/全局变量编辑**：键、值两个输入框各占左侧栏一半宽度；**请求头编辑**改为纯键/值输入框
   呈现（移除“启用”勾选框），默认请求头同样以输入框显示。
+- **问题反馈体系**：新增 GitHub Issue 表单（Bug / 功能建议 / 使用咨询）、反馈指南 `docs/FEEDBACK.md`，
+  README 增加「问题反馈」入口与**每周集中处理一次**的更新节奏说明；报告模板包含复现步骤、日志、
+  最小样例、环境等细节，便于复现与修复。
 - `LICENSE-MIT`, `LICENSE-APACHE`, `CHANGELOG.md`, `.gitignore`.
 
 ### Fixed

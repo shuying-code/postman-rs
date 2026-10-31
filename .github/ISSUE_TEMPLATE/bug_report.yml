@@ -1,0 +1,108 @@
+name: 🐞 Bug / 问题反馈
+description: 报告可复现的 Bug 或异常（请尽量填写完整，便于快速定位与修复）
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请尽量把信息填完整——**可复现的最小步骤与样例**能大幅加快定位和修复。
+
+        > 维护者通常**每周集中处理 / 回复一次** issue（约每周更新）。请勿重复提交同一问题。
+        > 提交前请先阅读 [使用反馈指南](https://github.com/zhouyulong123/postman-rs/blob/main/docs/FEEDBACK.md)。
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / 构建号
+      description: 见 `pmrs --version`，或 Release 页面的文件与 commit（例如 v0.1.0 · ecdfe4b）
+      placeholder: "v0.1.0 (commit ecdfe4b)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: channel
+    attributes:
+      label: 运行方式
+      options:
+        - GUI（桌面 pmrs-gui）
+        - CLI（pmrs）
+        - 容器镜像（GHCR）
+        - 从源码构建
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: 操作系统与架构
+      placeholder: "Windows 11 x64 / macOS 14 arm64 / Ubuntu 22.04 x64"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 一步一步写清楚，别人照做也能重现问题
+      placeholder: |
+        1. 打开 / 执行 ...
+        2. 输入 ...
+        3. 点击 / 运行 ...
+        4. 出现 ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果
+      description: 你期望发生什么？
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+      description: 实际发生了什么？可附截图 / 录屏链接
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 控制台输出 / 报错堆栈
+      description: GUI 侧栏「控制台」或终端输出；请粘贴完整报错（可脱敏）
+      render: shell
+
+  - type: textarea
+    id: repro_asset
+    attributes:
+      label: 最小复现样例（强烈建议）
+      description: 相关 Collection(v2.1) / 环境 JSON；或可复现的 cURL 命令；或 方法+URL+请求头+请求体
+      placeholder: |
+        curl -X POST 'https://api.example.com/x' -H 'Content-Type: application/json' -d '{"a":1}'
+        或粘贴最小集合/环境 JSON
+
+  - type: input
+    id: frequency
+    attributes:
+      label: 出现频率
+      placeholder: "必现 / 偶现（约几次出现一次）"
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其他补充
+      description: 是否使用代理 / 自签证书 / 客户端证书？能否公开数据？相关网络环境等
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 确认事项
+      options:
+        - label: 我已搜索现有 issue，未发现重复问题
+          required: true
+        - label: 我已移除 token / 密码 / 隐私等敏感信息
+          required: true
