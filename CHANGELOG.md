@@ -17,6 +17,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioning foll
 - **Dynamic variables**: ~30 more (`$randomLorem*`, `$randomImageUrl`, `$randomAvatar`, `$randomUserName`,
   `$randomBankAccount*`, `$randomCreditCardNumber`, `$randomAmount`, …).
 - **Extended HTTP method dropdown** (COPY/LINK/UNLINK/PURGE/LOCK/UNLOCK/PROPFIND/VIEW/TRACE).
+- **Container image (GHCR)**: `Dockerfile` + `.github/workflows/docker.yml` build and push the CLI
+  image to GitHub Packages (`ghcr.io/zhouyulong123/postman-rs`).
 - `LICENSE-MIT`, `LICENSE-APACHE`, `CHANGELOG.md`, `.gitignore`.
 
 ### Fixed

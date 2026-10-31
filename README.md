@@ -134,6 +134,20 @@ xattr -d com.apple.quarantine ./pmrs-macos-universal
 
 仓库已包含 `.github/workflows/build.yml`：推送后自动在 `windows-latest` / `macos-latest` / `ubuntu-latest` 上构建，并上传 `pmrs-windows-x64.zip`、`pmrs-gui-windows-x64.zip`、`pmrs-macos-universal.tar.gz`、`pmrs-linux-x64.tar.gz`。
 
+### 容器镜像（GitHub Packages / GHCR）
+
+仓库包含 `Dockerfile` 与 `.github/workflows/docker.yml`：推送到 `main` 或打 `v*` 标签时，会自动构建 **CLI 镜像**并推送到 GitHub 容器注册表，可在 `Packages` 页面下载 `ghcr.io/zhouyulong123/postman-rs`。
+
+```bash
+# 拉取并运行 CLI
+docker pull ghcr.io/zhouyulong123/postman-rs:latest
+docker run --rm ghcr.io/zhouyulong123/postman-rs:latest send "https://httpbin.org/get" -m GET
+
+# 挂载当前目录，方便读写集合 / 环境文件
+docker run --rm -v "$PWD:/work" -w /work \
+  ghcr.io/zhouyulong123/postman-rs:latest run examples/demo_collection.json -i 2
+```
+
 ---
 
 ## 使用
