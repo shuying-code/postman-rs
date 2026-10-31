@@ -3,13 +3,20 @@
 一个用 Rust 编写的 **本地化、无账号、无付费、无会员限制** 的 Postman 风格 API 客户端。
 它复刻了 Postman 最常用的**本地**能力，采用 **Postman Collection v2.1** 兼容格式，跨平台单二进制（Windows / macOS / Linux）。
 
+<p>
+  <img alt="Rust" src="https://img.shields.io/badge/rust-1.80%2B-orange">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green">
+  <img alt="Postman format" src="https://img.shields.io/badge/format-Postman%20v2.1-ff6c37">
+</p>
+
 > 本项目不连接 Postman 云端，不含登录、订阅、试用、Stripe、遥测。**所有功能对任何人无条件可用。**
 
 ---
 
 ## 为什么「无限制」
 
-Postman 的付费与登录主要约束**云端能力**（同步、团队、云端 Mock/Monitor、Vault、Governance、AI 等）。本工具只实现**不依赖云端**的本地能力，因此天然不需要账号、不需要付费、没有配额。详见 `../docs/03_补充二_登录·收费·会员限制与去除方案.md`。
+Postman 的付费与登录主要约束**云端能力**（同步、团队、云端 Mock/Monitor、Vault、Governance、AI 等）。本工具只实现**不依赖云端**的本地能力，因此天然不需要账号、不需要付费、没有配额。设计上移除了登录/订阅/会员限制，所有本地功能无条件可用。
 
 ---
 
@@ -229,6 +236,84 @@ cargo build --release
 macOS 的 Mach-O 二进制**无法在 Windows 上交叉编译**（需要 macOS SDK + ld64/clang）。在 Mac 真机上运行 `scripts/build-macos.sh` 生成 `pmrs-macos-universal` 与 `pmrs-gui-macos-universal`（arm64+x86_64 通用），或使用仓库内 CI（`.github/workflows/build.yml`）自动产出。
 
 ---
+
+## CLI 命令参考
+
+`pmrs` 提供 16 组子命令（`pmrs --help` 或 `pmrs <cmd> --help` 查看全部参数）：
+
+| 命令 | 作用 | 常用参数 |
+|---|---|---|
+| `send <URL>` | 发送单条请求 | `-m` 方法、`-H` 头、`-d` 体、`--body-type`、`-e` 环境、`--save-history`、`--timeout` |
+| `request` | 按名称运行集合中的请求 | 集合路径 + 请求名 + `-e` |
+| `run <collection>` | Collection Runner | `-i` 迭代、`-d` 数据(CSV/JSON)、`--delay`、`--folder`、`--bail`、`--report` |
+| `import <file>` | 导入集合/环境 | `--format postman\|openapi\|curl\|har\|auto`、`--no-save` |
+| `export <file>` | 导出为 v2.1 | `-o` 输出路径 |
+| `codegen` | 生成客户端代码 | `-l` 语言、`-c`/`-i` 集合+请求、`-u`/`-m` URL+方法 |
+| `collection` | 集合操作 | `list/show/new/add-folder/add-request/rm/rename/move/duplicate/export` |
+| `env` | 环境操作 | `list/show/new/set/export/delete` |
+| `globals` | 全局变量 | `list/show/set/clear` |
+| `history` | 历史记录 | `list/clear` |
+| `ws <URL>` | WebSocket | `--send`、`--listen`、`--header`、`--subprotocol`、`--binary` |
+| `sse <URL>` | Server-Sent Events | `-H`、`--count`、`--timeout` |
+| `mqtt <HOST> <TOPIC>` | MQTT（明文 TCP） | `-p`、`--publish/--message`、`--qos`、`--username/--password` |
+| `graphql <URL>` | GraphQL over HTTP | `-q`、`--variables`、`-e` |
+| `mock <collection>` | 本地 Mock 服务 | `--port`、`--delay` |
+| `perf` | 性能压测 | `-c/-i/-u/-m`、`--iterations`、`--concurrency`、`-e` |
+
+> `codegen -l` 支持：`curl / http / rust / python / js / go / nodejs / java / csharp / php / ruby / powershell / swift`。
+
+## 环境变量
+
+| 变量 | 作用 |
+|---|---|
+| `PMRS_HOME` | 工作区根目录（默认 `~/.postman-rs`） |
+| `PMRS_PROXY` | HTTP/SOCKS 代理，如 `http://127.0.0.1:7890`、`socks5h://127.0.0.1:1080` |
+| `PMRS_CA_BUNDLE` | 自定义 CA 证书（PEM）路径 |
+| `PMRS_CLIENT_CERT` / `PMRS_CLIENT_KEY` | 客户端证书 / 私钥（PEM），自动拼接用于 mTLS |
+| `PMRS_INSECURE` | 设为 `1` 时跳过 TLS 校验 |
+| `PMRS_CONNECT_TIMEOUT` | 连接超时（秒） |
+| `PMRS_MAX_REDIRECTS` | 最大重定向次数（默认 10） |
+| `PMRS_THEME` | GUI 主题编号 `0..7` |
+| `PMRS_GUI_SIDEBAR` | GUI 初始侧栏页 `0..5`（集合 / 环境 / 全局 / 历史 / 工具 / 控制台） |
+
+## 图形界面（快速上手）
+
+1. 双击 `pmrs-gui-windows-x64.exe`（免安装；macOS 用 `pmrs-gui-macos-universal`）。首次左栏为空属正常，先导入示例或新建集合。
+2. 顶栏选择「环境」「主题」；右侧多标签构建请求（参数 / 授权 / 请求头 / 请求体 / 测试 / 脚本 / 设置 / 描述）。
+3. 点「发送」查看响应（响应体 / 响应头 / Cookies / 测试 / 计时）；侧栏「控制台」可查看请求/响应/脚本日志。
+4. 左栏「工具」页可导入、运行集合、生成代码、切换主题、管理 Cookie、使用 WebSocket 工作台。
+
+## 项目结构
+
+```
+postman-rs/
+├─ src/
+│  ├─ main.rs          # CLI（clap）入口与 16 组子命令
+│  ├─ bin/gui.rs       # pmrs-gui（egui/eframe 桌面程序，中文界面）
+│  ├─ model.rs         # Postman v2.1 数据模型（Collection/Item/Request/UrlSpec/Auth/Body…）
+│  ├─ http.rs          # reqwest 执行、鉴权、Cookie、计时、NetConfig
+│  ├─ variables.rs     # 变量作用域 + 动态变量
+│  ├─ scripting.rs     # 轻量 pm.* 脚本（pm.test / pm.expect / pm.response…）
+│  ├─ tests_engine.rs  # 声明式断言引擎
+│  ├─ runner.rs        # Collection Runner
+│  ├─ import_export.rs # 导入/导出（postman / openapi / curl / har）
+│  ├─ codegen.rs       # 13 语言代码生成
+│  ├─ ws.rs / sse.rs / mqtt.rs / mock.rs / perf.rs
+│  └─ storage.rs       # 本地文件工作区
+├─ tests/integration.rs
+├─ examples/           # demo collection / environment / sample.curl
+├─ scripts/build-macos.sh
+├─ .github/workflows/build.yml   # Windows / macOS / Linux 三平台 CI
+└─ dist/               # 预编译产物（git 忽略）
+```
+
+## 本次更新摘要（P0–P3）
+
+- **P0**：`pm.expect` 匹配器大幅补全（`.not / lengthOf / property / a / match / oneOf / closeTo / …`）。
+- **P1**：GUI 全局变量生效；GUI 发送继承集合/文件夹 auth·变量·脚本；新增 Postman 控制台。
+- **P0/P1**：请求「描述」编辑与持久化（`item.description`）。
+- **P3**：方法下拉 16 种；动态变量再补 ~30 个。
+- 详见根目录 `CHANGELOG.md`；macOS 打包含见 `docs/13_macOS打包说明.md` 与 `.github/workflows/build.yml`。
 
 ## 许可
 
