@@ -24,6 +24,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioning foll
 ### Fixed
 - **GUI ignored global variables** when sending (`ctx_from` did not merge `globals`).
 - `pm.response.json()` no longer collapses JSON `null` into empty string.
+- **GUI 左侧栏黑边**：侧栏内多控件行（如「应用强调色/恢复默认」「监听条数/等待/连接并发送」）
+  横向溢出，使面板分配宽度大于实际绘制宽度，露出窗口清屏黑底形成竖直黑边。现将侧栏各行改为
+  `horizontal_wrapped` 自动换行，并为窗口设置主题背景 `clear_color`，彻底消除黑边。
 
 ## [0.1.0]
 

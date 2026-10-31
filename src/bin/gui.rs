@@ -1938,7 +1938,7 @@ impl GuiApp {
         }
         // 新建集合
         ui.add_space(4.0);
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             let w = (ui.available_width() - 76.0).max(60.0);
             ui.add(
                 egui::TextEdit::singleline(&mut self.coll_new_name)
@@ -2009,7 +2009,7 @@ impl GuiApp {
             .id_salt("reqtree")
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     let w = (ui.available_width() - 86.0).max(50.0);
                     ui.add(
                         egui::TextEdit::singleline(&mut self.folder_name)
@@ -2043,7 +2043,7 @@ impl GuiApp {
                         continue;
                     }
                     let ind = row.depth as f32 * 14.0;
-                    ui.horizontal(|ui| {
+                    ui.horizontal_wrapped(|ui| {
                         ui.add_space(ind);
                         if row.is_folder {
                             ui.label(RichText::new("📁").size(13.0));
@@ -2507,7 +2507,7 @@ impl GuiApp {
         {
             self.globals_edit.push((String::new(), String::new()));
         }
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             if ui
                 .add(
                     egui::Button::new(
@@ -2643,7 +2643,7 @@ impl GuiApp {
     fn ui_side_console(&mut self, ui: &mut egui::Ui) {
         section_title(ui, "控制台");
         ui.add_space(6.0);
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             if ui.button("清空").clicked() {
                 self.console.clear();
             }
@@ -2681,7 +2681,7 @@ impl GuiApp {
             .show(ui, |ui| {
                 // 外观 / 主题
                 section_title(ui, "外观 / 主题");
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     let mut sel = self.theme;
                     egui::ComboBox::from_id_salt("tools_theme")
                         .width(150.0)
@@ -2710,7 +2710,7 @@ impl GuiApp {
                         FOLLOW_SYSTEM.store(follow, Ordering::Relaxed);
                     }
                 });
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("强调色 #").color(text_secondary()).size(12.0));
                     ui.add(
                         egui::TextEdit::singleline(&mut self.accent_hex)
@@ -2762,7 +2762,7 @@ impl GuiApp {
                         .hint_text("ws:// 或 wss:// 地址")
                         .desired_width(f32::INFINITY),
                 );
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("子协议").color(text_secondary()).size(12.0));
                     ui.add(
                         egui::TextEdit::singleline(&mut self.ws_subprotocol)
@@ -2785,7 +2785,7 @@ impl GuiApp {
                         .desired_width(f32::INFINITY)
                         .hint_text("{\"type\":\"ping\"}"),
                 );
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("监听条数").color(text_secondary()).size(12.0));
                     ui.add(egui::DragValue::new(&mut self.ws_listen).range(0..=1000));
                     ui.label(RichText::new("等待(ms)").color(text_secondary()).size(12.0));
@@ -2824,7 +2824,7 @@ impl GuiApp {
                         .hint_text("文件路径（.json / .yaml / curl 文本 / .har）")
                         .desired_width(f32::INFINITY),
                 );
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     egui::ComboBox::from_id_salt("import_fmt")
                         .width(150.0)
                         .selected_text(import_format_label(&self.import_format))
@@ -2891,7 +2891,7 @@ impl GuiApp {
                         .color(text_secondary())
                         .size(12.0),
                 );
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("迭代").color(text_secondary()).size(12.0));
                     ui.add(egui::DragValue::new(&mut self.run_iterations).range(1..=1000));
                     ui.checkbox(&mut self.run_bail, RichText::new("失败即停").color(text_secondary()));
@@ -2930,7 +2930,7 @@ impl GuiApp {
 
                 // 代码生成
                 section_title(ui, "代码生成（当前标签）");
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     egui::ComboBox::from_id_salt("codegen_lang")
                         .selected_text(&self.codegen_lang)
                         .show_ui(ui, |ui| {
@@ -3022,7 +3022,7 @@ impl GuiApp {
                             }
                         });
                 }
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.add(
                         egui::TextEdit::singleline(&mut self.cookie_new_host)
                             .desired_width(110.0)
@@ -4605,6 +4605,11 @@ impl GuiApp {
     }
 }
 impl eframe::App for GuiApp {
+    /// 用主题背景色清屏：即使某个面板因内容溢出而没有铺满，也不会露出纯黑底（黑边）。
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        bg_side().to_normalized_gamma_f32()
+    }
+
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // 跟随系统：按操作系统深浅色偏好选择内置的浅色/深色主题。
         if self.follow_system {
