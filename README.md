@@ -1,5 +1,7 @@
 # postman-rs (`pmrs`)
 
+<p align="center">🌐 <b>Language</b>：<a href="README.md">简体中文</a> · <a href="README.en.md">English</a> · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a> · <a href="README.ru.md">Русский</a> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.de.md">Deutsch</a> · <a href="README.pt-BR.md">Português</a></p>
+
 一个用 Rust 编写的 **本地化、无账号、无付费、无会员限制** 的 Postman 风格 API 客户端。
 它复刻了 Postman 最常用的**本地**能力，采用 **Postman Collection v2.1** 兼容格式，跨平台单二进制（Windows / macOS / Linux）。
 
@@ -136,16 +138,16 @@ xattr -d com.apple.quarantine ./pmrs-macos-universal
 
 ### 容器镜像（GitHub Packages / GHCR）
 
-仓库包含 `Dockerfile` 与 `.github/workflows/docker.yml`：推送到 `main` 或打 `v*` 标签时，会自动构建 **CLI 镜像**并推送到 GitHub 容器注册表，可在 `Packages` 页面下载 `ghcr.io/zhouyulong123/postman-rs`。
+仓库包含 `Dockerfile` 与 `.github/workflows/docker.yml`：推送到 `main` 或打 `v*` 标签时，会自动构建 **CLI 镜像**并推送到 GitHub 容器注册表，可在 `Packages` 页面下载 `ghcr.io/shuying-code/postman-rs`。
 
 ```bash
 # 拉取并运行 CLI
-docker pull ghcr.io/zhouyulong123/postman-rs:latest
-docker run --rm ghcr.io/zhouyulong123/postman-rs:latest send "https://httpbin.org/get" -m GET
+docker pull ghcr.io/shuying-code/postman-rs:latest
+docker run --rm ghcr.io/shuying-code/postman-rs:latest send "https://httpbin.org/get" -m GET
 
 # 挂载当前目录，方便读写集合 / 环境文件
 docker run --rm -v "$PWD:/work" -w /work \
-  ghcr.io/zhouyulong123/postman-rs:latest run examples/demo_collection.json -i 2
+  ghcr.io/shuying-code/postman-rs:latest run examples/demo_collection.json -i 2
 ```
 
 ---
@@ -253,7 +255,7 @@ macOS 的 Mach-O 二进制**无法在 Windows 上交叉编译**（需要 macOS S
 
 ## 问题反馈（Issues）
 
-遇到问题或有建议？欢迎通过 GitHub Issues 反馈：<https://github.com/zhouyulong123/postman-rs/issues/new/choose>。提交前请先阅读 **[使用反馈指南](docs/FEEDBACK.md)**。
+遇到问题或有建议？欢迎通过 GitHub Issues 反馈：<https://github.com/shuying-code/postman-rs/issues/new/choose>。提交前请先阅读 **[使用反馈指南](docs/FEEDBACK.md)**。
 
 - **🐞 Bug / 问题反馈**：可复现的功能异常、崩溃、报错
 - **💡 功能建议**：新功能或改进

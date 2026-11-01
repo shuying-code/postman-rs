@@ -4,7 +4,7 @@
 
 ## 反馈入口
 
-- **新建问题 / 建议**：<https://github.com/zhouyulong123/postman-rs/issues/new/choose>
+- **新建问题 / 建议**：<https://github.com/shuying-code/postman-rs/issues/new/choose>
   - 🐞 **Bug / 问题反馈** —— 可复现的功能异常、崩溃、报错
   - 💡 **功能建议** —— 新功能或改进
   - ❓ **使用咨询 / 反馈** —— 用法、配置、一般性反馈
@@ -18,9 +18,9 @@
 
 ## 提交前检查清单
 
-- [ ] 已搜索 [现有 issues](https://github.com/zhouyulong123/postman-rs/issues?q=is%3Aissue)，没有重复。
+- [ ] 已搜索 [现有 issues](https://github.com/shuying-code/postman-rs/issues?q=is%3Aissue)，没有重复。
 - [ ] 已查阅 [README](../README.md) 与 [FAQ](../README.md#常见问题faq)。
-- [ ] 使用的是**最新版本**（见 [Releases](https://github.com/zhouyulong123/postman-rs/releases)）；旧版本请先升级复测。
+- [ ] 使用的是**最新版本**（见 [Releases](https://github.com/shuying-code/postman-rs/releases)）；旧版本请先升级复测。
 - [ ] 已移除 **token / 密码 / 隐私数据**等敏感信息。
 
 ## 需要提供的关键信息（越全越好）

@@ -18,7 +18,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioning foll
   `$randomBankAccount*`, `$randomCreditCardNumber`, `$randomAmount`, …).
 - **Extended HTTP method dropdown** (COPY/LINK/UNLINK/PURGE/LOCK/UNLOCK/PROPFIND/VIEW/TRACE).
 - **Container image (GHCR)**: `Dockerfile` + `.github/workflows/docker.yml` build and push the CLI
-  image to GitHub Packages (`ghcr.io/zhouyulong123/postman-rs`).
+  image to GitHub Packages (`ghcr.io/shuying-code/postman-rs`).
 - **cURL 导出增强**：请求卡片新增「导出」按钮，代码生成面板新增「保存为文件」，可把当前请求
   导出为 cURL/各语言文件到 `~/.postman-rs/exports/`（原有「复制 cURL」「从 cURL 导入」保留）。
 - **新建请求对话框**：新建标签时可命名并选择方法；`POST/PUT/PATCH` 自动带上默认请求头
