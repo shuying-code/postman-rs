@@ -341,6 +341,7 @@ postman-rs/
 - **P1**：GUI 全局变量生效；GUI 发送继承集合/文件夹 auth·变量·脚本；新增 Postman 控制台。
 - **P0/P1**：请求「描述」编辑与持久化（`item.description`）。
 - **P3**：方法下拉 16 种；动态变量再补 ~30 个。
+- **GUI 布局修复**：参数 / 路径变量 / 请求体表单 / 授权扩展的「键 / 值」输入框统一各占一半，详见 `docs/14_键值输入框各占一半修复.md`。
 - 详见根目录 `CHANGELOG.md`；macOS 打包含见 `docs/13_macOS打包说明.md` 与 `.github/workflows/build.yml`。
 
 ## 许可

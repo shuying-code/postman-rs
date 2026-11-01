@@ -2,7 +2,7 @@
 name = "postman-rs"
 version = "0.1.0"
 edition = "2021"
-description = "A local, account-free, payment-free Postman-style API client (Rust replica of Postman local features)"
+description = "A local, account-free, payment-free Postman-style API client (Rust, cross-platform CLI + egui GUI)"
 license = "MIT OR Apache-2.0"
 
 [lib]

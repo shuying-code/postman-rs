@@ -35,6 +35,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioning foll
 ### Fixed
 - **GUI ignored global variables** when sending (`ctx_from` did not merge `globals`).
 - `pm.response.json()` no longer collapses JSON `null` into empty string.
+- **键/值输入框过窄**：参数、路径变量、请求体（x-www-form-urlencoded / form-data）、
+  授权扩展（OAuth1/AWS SigV4/JWT/Digest）等页面的「键」「值」输入框在 `ScrollArea` 内
+  因 `Grid::desired_width` 宽度塌缩而变得极小；现统一改为「键、值各占可用宽度的一半」
+  的水平布局（右侧保留类型/删除按钮），填满整张卡片。
 - **GUI 左侧栏黑边**：侧栏内多控件行（如「应用强调色/恢复默认」「监听条数/等待/连接并发送」）
   横向溢出，使面板分配宽度大于实际绘制宽度，露出窗口清屏黑底形成竖直黑边。现将侧栏各行改为
   `horizontal_wrapped` 自动换行，并为窗口设置主题背景 `clear_color`，彻底消除黑边。

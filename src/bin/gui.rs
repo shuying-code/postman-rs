@@ -723,12 +723,14 @@ struct Tab {
 }
 impl Tab {
     fn new(n: usize) -> Self {
+        // 截图/验收用种子（无副作用；仅当设置 PMRS_GUI_DEMO 时生效）。
+        let demo = std::env::var("PMRS_GUI_DEMO").is_ok();
         Tab {
             title: format!("请求 {}", n),
             method: "GET".into(),
             url: String::new(),
             headers: vec![HeaderRow::default()],
-            body_type: "none".into(),
+            body_type: std::env::var("PMRS_GUI_BODYTYPE").unwrap_or_else(|_| "none".into()),
             body: String::new(),
             raw_lang: "JSON".into(),
             url_rows: vec![KVRow::default()],
@@ -736,10 +738,10 @@ impl Tab {
             file_path: String::new(),
             gql_query: String::new(),
             gql_vars: String::new(),
-            params: Vec::new(),
-            path_rows: Vec::new(),
+            params: if demo { vec![KVRow::default()] } else { Vec::new() },
+            path_rows: if demo { vec![KVRow::default()] } else { Vec::new() },
             hash: String::new(),
-            auth_kind: "none".into(),
+            auth_kind: std::env::var("PMRS_GUI_AUTHKIND").unwrap_or_else(|_| "none".into()),
             auth_token: String::new(),
             auth_user: String::new(),
             auth_pass: String::new(),
@@ -758,7 +760,11 @@ impl Tab {
             insecure: false,
             client_cert: String::new(),
             client_key: String::new(),
-            req_subtab: 2,
+            req_subtab: std::env::var("PMRS_GUI_REQTAB")
+                .ok()
+                .and_then(|s| s.trim().parse().ok())
+                .filter(|n| *n < 8)
+                .unwrap_or(2),
             resp_subtab: 0,
             pretty: false,
             tests: Vec::new(),
@@ -3868,45 +3874,55 @@ impl GuiApp {
         );
         ui.add_space(4.0);
         let mut changed = false;
-        let avail = ui.available_width();
-        let key_w = (avail * 0.28).clamp(110.0, 260.0);
-        let val_w = (avail - key_w - 64.0).clamp(150.0, 1400.0);
-        egui::Grid::new("params_grid")
-            .num_columns(4)
-            .striped(true)
-            .spacing([8.0, 6.0])
-            .show(ui, |ui| {
-                ui.label(RichText::new("启用").color(text_secondary()).size(11.0));
-                ui.label(RichText::new("键").color(text_secondary()).size(11.0));
-                ui.label(RichText::new("值").color(text_secondary()).size(11.0));
-                ui.label("");
-                ui.end_row();
-                let mut remove: Option<usize> = None;
-                for (i, r) in tab.params.iter_mut().enumerate() {
+        const ROW_H: f32 = 22.0;
+        const CHECK_W: f32 = 22.0;
+        const DEL_W: f32 = 26.0;
+        // 键、值各占一半：以「启用」勾选框之后的可用宽度二等分，右侧预留「×」按钮。
+        ui.horizontal(|ui| {
+            ui.add_space(CHECK_W);
+            let rem = (ui.available_width() - DEL_W).max(120.0);
+            let half = ((rem - 8.0) / 2.0).max(60.0);
+            ui.add_sized(
+                [half, 16.0],
+                egui::Label::new(RichText::new("键").color(text_secondary()).size(11.0)),
+            );
+            ui.add_sized(
+                [half, 16.0],
+                egui::Label::new(RichText::new("值").color(text_secondary()).size(11.0)),
+            );
+        });
+        ui.add_space(2.0);
+        let mut remove: Option<usize> = None;
+        for i in 0..tab.params.len() {
+            let mut remove_this = false;
+            let mut row_changed = false;
+            {
+                let r = &mut tab.params[i];
+                ui.horizontal(|ui| {
                     let mut enabled = !r.disabled;
                     if ui.checkbox(&mut enabled, "").changed() {
                         r.disabled = !enabled;
-                        changed = true;
+                        row_changed = true;
                     }
+                    let rem = (ui.available_width() - DEL_W).max(120.0);
+                    let half = ((rem - 8.0) / 2.0).max(60.0);
                     if ui
-                        .add(
-                            egui::TextEdit::singleline(&mut r.key)
-                                .desired_width(key_w)
-                                .hint_text("键"),
+                        .add_sized(
+                            [half, ROW_H],
+                            egui::TextEdit::singleline(&mut r.key).hint_text("键"),
                         )
                         .changed()
                     {
-                        changed = true;
+                        row_changed = true;
                     }
                     if ui
-                        .add(
-                            egui::TextEdit::singleline(&mut r.value)
-                                .desired_width(val_w)
-                                .hint_text("值"),
+                        .add_sized(
+                            [half, ROW_H],
+                            egui::TextEdit::singleline(&mut r.value).hint_text("值"),
                         )
                         .changed()
                     {
-                        changed = true;
+                        row_changed = true;
                     }
                     if ui
                         .add(
@@ -3915,15 +3931,21 @@ impl GuiApp {
                         )
                         .clicked()
                     {
-                        remove = Some(i);
+                        remove_this = true;
                     }
-                    ui.end_row();
-                }
-                if let Some(i) = remove {
-                    tab.params.remove(i);
-                    changed = true;
-                }
-            });
+                });
+            }
+            if row_changed {
+                changed = true;
+            }
+            if remove_this {
+                remove = Some(i);
+            }
+        }
+        if let Some(i) = remove {
+            tab.params.remove(i);
+            changed = true;
+        }
         if ui
             .add(
                 egui::Button::new(RichText::new("＋ 添加参数").color(brand()))
@@ -3943,42 +3965,47 @@ impl GuiApp {
                     .size(11.0),
             );
             ui.add_space(4.0);
-            egui::Grid::new("pathvars_grid")
-                .num_columns(3)
-                .striped(true)
-                .spacing([8.0, 6.0])
-                .show(ui, |ui| {
-                    ui.label(RichText::new("名称").color(text_secondary()).size(11.0));
-                    ui.label(RichText::new("值").color(text_secondary()).size(11.0));
-                    ui.label("");
-                    ui.end_row();
-                    let mut rmv: Option<usize> = None;
-                    for (i, r) in tab.path_rows.iter_mut().enumerate() {
-                        ui.add(
-                            egui::TextEdit::singleline(&mut r.key)
-                                .desired_width(key_w)
-                                .hint_text("名称"),
-                        );
-                        ui.add(
-                            egui::TextEdit::singleline(&mut r.value)
-                                .desired_width(val_w)
-                                .hint_text("值"),
-                        );
-                        if ui
-                            .add(
-                                egui::Button::new(RichText::new("×").color(text_secondary()))
-                                    .frame(false),
-                            )
-                            .clicked()
-                        {
-                            rmv = Some(i);
-                        }
-                        ui.end_row();
-                    }
-                    if let Some(i) = rmv {
-                        tab.path_rows.remove(i);
+            // 名称、值各占一半：占满可用宽度，右侧预留「×」按钮。
+            ui.horizontal(|ui| {
+                let rem = (ui.available_width() - DEL_W).max(120.0);
+                let half = ((rem - 8.0) / 2.0).max(60.0);
+                ui.add_sized(
+                    [half, 16.0],
+                    egui::Label::new(RichText::new("名称").color(text_secondary()).size(11.0)),
+                );
+                ui.add_sized(
+                    [half, 16.0],
+                    egui::Label::new(RichText::new("值").color(text_secondary()).size(11.0)),
+                );
+            });
+            ui.add_space(2.0);
+            let mut rmv: Option<usize> = None;
+            for (i, r) in tab.path_rows.iter_mut().enumerate() {
+                ui.horizontal(|ui| {
+                    let rem = (ui.available_width() - DEL_W).max(120.0);
+                    let half = ((rem - 8.0) / 2.0).max(60.0);
+                    ui.add_sized(
+                        [half, ROW_H],
+                        egui::TextEdit::singleline(&mut r.key).hint_text("名称"),
+                    );
+                    ui.add_sized(
+                        [half, ROW_H],
+                        egui::TextEdit::singleline(&mut r.value).hint_text("值"),
+                    );
+                    if ui
+                        .add(
+                            egui::Button::new(RichText::new("×").color(text_secondary()))
+                                .frame(false),
+                        )
+                        .clicked()
+                    {
+                        rmv = Some(i);
                     }
                 });
+            }
+            if let Some(i) = rmv {
+                tab.path_rows.remove(i);
+            }
         }
         // URL 片段 hash
         ui.add_space(10.0);
@@ -4127,25 +4154,32 @@ impl GuiApp {
                             .size(11.0),
                     );
                 }
-                egui::Grid::new("auth_extra_grid")
-                    .num_columns(2)
-                    .striped(true)
-                    .spacing([8.0, 6.0])
-                    .show(ui, |ui| {
-                        for r in tab.auth_extra.iter_mut() {
-                            ui.add(
-                                egui::TextEdit::singleline(&mut r.key)
-                                    .desired_width(150.0)
-                                    .hint_text("键"),
-                            );
-                            ui.add(
-                                egui::TextEdit::singleline(&mut r.value)
-                                    .desired_width(300.0)
-                                    .hint_text("值"),
-                            );
-                            ui.end_row();
-                        }
+                // 键、值各占一半，填满可用宽度。
+                ui.horizontal(|ui| {
+                    let half = ((ui.available_width() - 8.0) / 2.0).max(60.0);
+                    ui.add_sized(
+                        [half, 16.0],
+                        egui::Label::new(RichText::new("键").color(text_secondary()).size(11.0)),
+                    );
+                    ui.add_sized(
+                        [half, 16.0],
+                        egui::Label::new(RichText::new("值").color(text_secondary()).size(11.0)),
+                    );
+                });
+                ui.add_space(2.0);
+                for r in tab.auth_extra.iter_mut() {
+                    ui.horizontal(|ui| {
+                        let half = ((ui.available_width() - 8.0) / 2.0).max(60.0);
+                        ui.add_sized(
+                            [half, 22.0],
+                            egui::TextEdit::singleline(&mut r.key).hint_text("键"),
+                        );
+                        ui.add_sized(
+                            [half, 22.0],
+                            egui::TextEdit::singleline(&mut r.value).hint_text("值"),
+                        );
                     });
+                }
             }
             _ => {
                 ui.label(RichText::new("此请求不使用授权。").color(text_secondary()));
@@ -4285,9 +4319,6 @@ impl GuiApp {
             }
         });
         ui.add_space(8.0);
-        let avail = ui.available_width();
-        let key_w = (avail * 0.30).clamp(120.0, 280.0);
-        let val_w = (avail - key_w - 88.0).clamp(150.0, 1400.0);
         match tab.body_type.as_str() {
             "none" => {
                 ui.label(
@@ -4312,10 +4343,10 @@ impl GuiApp {
                 );
             }
             "x-www-form-urlencoded" => {
-                Self::ui_kv_editor(ui, &mut tab.url_rows, key_w, val_w, false, "urlenc");
+                Self::ui_kv_editor(ui, &mut tab.url_rows, false, "urlenc");
             }
             "form-data" => {
-                Self::ui_kv_editor(ui, &mut tab.form_rows, key_w, val_w, true, "formdata");
+                Self::ui_kv_editor(ui, &mut tab.form_rows, true, "formdata");
             }
             "binary" => {
                 ui.label(
@@ -4363,71 +4394,75 @@ impl GuiApp {
     fn ui_kv_editor(
         ui: &mut egui::Ui,
         rows: &mut Vec<KVRow>,
-        key_w: f32,
-        val_w: f32,
         allow_file: bool,
         id: &str,
     ) {
+        const ROW_H: f32 = 22.0;
+        const CHECK_W: f32 = 22.0;
+        const DEL_W: f32 = 26.0;
+        let reserved = DEL_W + if allow_file { 84.0 } else { 0.0 };
+        // 键、值各占一半：勾选框之后、类型/删除之前，剩余宽度二等分并填满。
+        ui.horizontal(|ui| {
+            ui.add_space(CHECK_W);
+            let rem = (ui.available_width() - reserved).max(160.0);
+            let half = ((rem - 8.0) / 2.0).max(60.0);
+            ui.add_sized(
+                [half, 16.0],
+                egui::Label::new(RichText::new("键").color(text_secondary()).size(11.0)),
+            );
+            ui.add_sized(
+                [half, 16.0],
+                egui::Label::new(RichText::new("值").color(text_secondary()).size(11.0)),
+            );
+        });
+        ui.add_space(2.0);
         let mut remove: Option<usize> = None;
-        egui::Grid::new(format!("kv_{}", id))
-            .num_columns(if allow_file { 5 } else { 4 })
-            .striped(true)
-            .spacing([8.0, 6.0])
-            .show(ui, |ui| {
-                ui.label(RichText::new("启用").color(text_secondary()).size(11.0));
-                ui.label(RichText::new("键").color(text_secondary()).size(11.0));
-                ui.label(RichText::new("值").color(text_secondary()).size(11.0));
+        for (i, r) in rows.iter_mut().enumerate() {
+            ui.horizontal(|ui| {
+                let mut enabled = !r.disabled;
+                if ui.checkbox(&mut enabled, "").changed() {
+                    r.disabled = !enabled;
+                }
+                let rem = (ui.available_width() - reserved).max(160.0);
+                let half = ((rem - 8.0) / 2.0).max(60.0);
+                ui.add_sized(
+                    [half, ROW_H],
+                    egui::TextEdit::singleline(&mut r.key).hint_text("键"),
+                );
+                let hint = if allow_file && r.is_file {
+                    "文件路径"
+                } else {
+                    "值"
+                };
+                ui.add_sized(
+                    [half, ROW_H],
+                    egui::TextEdit::singleline(&mut r.value).hint_text(hint),
+                );
                 if allow_file {
-                    ui.label(RichText::new("类型").color(text_secondary()).size(11.0));
+                    let mut is_file = r.is_file;
+                    egui::ComboBox::from_id_salt(format!("kvtype_{}_{}", id, i))
+                        .width(72.0)
+                        .selected_text(if is_file { "文件" } else { "文本" })
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut is_file, false, "文本");
+                            ui.selectable_value(&mut is_file, true, "文件");
+                        });
+                    r.is_file = is_file;
                 }
-                ui.label("");
-                ui.end_row();
-                for (i, r) in rows.iter_mut().enumerate() {
-                    let mut enabled = !r.disabled;
-                    if ui.checkbox(&mut enabled, "").changed() {
-                        r.disabled = !enabled;
-                    }
-                    ui.add(
-                        egui::TextEdit::singleline(&mut r.key)
-                            .desired_width(key_w)
-                            .hint_text("键"),
-                    );
-                    let hint = if allow_file && r.is_file {
-                        "文件路径"
-                    } else {
-                        "值"
-                    };
-                    ui.add(
-                        egui::TextEdit::singleline(&mut r.value)
-                            .desired_width(val_w)
-                            .hint_text(hint),
-                    );
-                    if allow_file {
-                        let mut is_file = r.is_file;
-                        egui::ComboBox::from_id_salt(format!("kvtype_{}_{}", id, i))
-                            .width(72.0)
-                            .selected_text(if is_file { "文件" } else { "文本" })
-                            .show_ui(ui, |ui| {
-                                ui.selectable_value(&mut is_file, false, "文本");
-                                ui.selectable_value(&mut is_file, true, "文件");
-                            });
-                        r.is_file = is_file;
-                    }
-                    if ui
-                        .add(
-                            egui::Button::new(RichText::new("×").color(text_secondary()))
-                                .frame(false),
-                        )
-                        .clicked()
-                    {
-                        remove = Some(i);
-                    }
-                    ui.end_row();
-                }
-                if let Some(i) = remove {
-                    rows.remove(i);
+                if ui
+                    .add(
+                        egui::Button::new(RichText::new("×").color(text_secondary()))
+                            .frame(false),
+                    )
+                    .clicked()
+                {
+                    remove = Some(i);
                 }
             });
+        }
+        if let Some(i) = remove {
+            rows.remove(i);
+        }
         if ui
             .add(
                 egui::Button::new(RichText::new("＋ 添加一行").color(brand()))
