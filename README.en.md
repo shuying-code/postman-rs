@@ -2,6 +2,8 @@
 
 # postman-rs (`pmrs`)
 
+> 📘 **[User Manual](docs/用户操作手册.en.md)** · [简体中文手册](docs/用户操作手册.md)
+
 A **local, account-free, pay-free, membership-free** Postman-style API client written in Rust. It reproduces Postman's most-used **local** capabilities, uses the **Postman Collection v2.1** compatible format, and is a cross-platform single binary (Windows / macOS / Linux).
 
 <p>
