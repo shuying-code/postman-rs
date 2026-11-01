@@ -766,7 +766,8 @@ impl Tab {
                 .filter(|n| *n < 8)
                 .unwrap_or(2),
             resp_subtab: 0,
-            pretty: false,
+            // 响应体默认自动格式化：内容是 JSON 时自动美化输出（可勾选/取消「美化」切换）
+            pretty: true,
             tests: Vec::new(),
             tests_text: String::new(),
             pre_script: String::new(),
@@ -1093,6 +1094,14 @@ struct GuiApp {
     new_req_dialog: bool,
     new_req_name: String,
     new_req_method: String,
+    /// cURL 导入弹窗是否打开（由 URL 栏 cURL 按钮的菜单触发）
+    curl_import_open: bool,
+    /// 正在重命名的请求标签索引
+    renaming_tab: Option<usize>,
+    /// 标签重命名输入框内容
+    rename_tab_text: String,
+    /// 标签重命名输入框是否需要自动聚焦（一次性）
+    rename_tab_focus: bool,
 }
 
 /// 需要二次确认的删除/破坏性操作。
@@ -1194,6 +1203,10 @@ impl GuiApp {
             new_req_dialog: false,
             new_req_name: String::new(),
             new_req_method: "GET".into(),
+            curl_import_open: false,
+            renaming_tab: None,
+            rename_tab_text: String::new(),
+            rename_tab_focus: false,
         };
         app.refresh_all();
         app
@@ -1947,6 +1960,69 @@ impl GuiApp {
             self.create_request_from_dialog();
         } else if cancel {
             self.new_req_dialog = false;
+        }
+    }
+
+    /// 「从 cURL 导入（粘贴）」弹窗：粘贴一条 curl 命令，点“解析为新标签”生成请求。
+    fn show_curl_import_dialog(&mut self, ctx: &egui::Context) {
+        if !self.curl_import_open {
+            return;
+        }
+        let mut parse = false;
+        let mut cancel = false;
+        egui::Window::new("从 cURL 导入（粘贴）")
+            .order(egui::Order::Foreground)
+            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+            .collapsible(false)
+            .resizable(true)
+            .default_width(560.0)
+            .show(ctx, |ui| {
+                ui.set_min_width(520.0);
+                ui.add_space(2.0);
+                ui.label(
+                    RichText::new("粘贴 curl 命令，例如：curl -X POST 'https://api.test/x' -H 'Content-Type: application/json' -d '{\"a\":1}'")
+                        .color(text_secondary())
+                        .size(11.0),
+                );
+                ui.add_space(4.0);
+                ui.add(
+                    egui::TextEdit::multiline(&mut self.curl_input)
+                        .code_editor()
+                        .desired_rows(6)
+                        .desired_width(f32::INFINITY)
+                        .hint_text("在此粘贴整条 curl 命令"),
+                );
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    if ui
+                        .add(
+                            egui::Button::new(RichText::new("取消").color(text_secondary()))
+                                .min_size(egui::vec2(84.0, 28.0)),
+                        )
+                        .clicked()
+                    {
+                        cancel = true;
+                    }
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                RichText::new("解析为新标签").color(Color32::WHITE).strong(),
+                            )
+                            .fill(brand())
+                            .rounding(Rounding::same(6.0))
+                            .min_size(egui::vec2(110.0, 28.0)),
+                        )
+                        .clicked()
+                    {
+                        parse = true;
+                    }
+                });
+            });
+        if parse {
+            self.import_curl_to_tab();
+            self.curl_import_open = false;
+        } else if cancel {
+            self.curl_import_open = false;
         }
     }
 
@@ -3652,6 +3728,9 @@ impl GuiApp {
         let mut select: Option<usize> = None;
         let mut close: Option<usize> = None;
         let mut add = false;
+        let mut start_rename: Option<(usize, String)> = None;
+        let mut commit_rename: Option<(usize, String)> = None;
+        let mut cancel_rename = false;
         ui.horizontal_wrapped(|ui| {
             for i in 0..self.tabs.len() {
                 let title = self.tabs[i].title.clone();
@@ -3659,6 +3738,7 @@ impl GuiApp {
                 let bg = if active { bg_panel() } else { Color32::TRANSPARENT };
                 let border_c = if active { brand() } else { Color32::TRANSPARENT };
                 let tc = if active { brand() } else { text_secondary() };
+                let renaming = self.renaming_tab == Some(i);
                 egui::Frame::none()
                     .fill(bg)
                     .stroke(Stroke::new(1.0_f32, border_c))
@@ -3666,16 +3746,42 @@ impl GuiApp {
                     .inner_margin(egui::Margin::symmetric(10.0, 5.0))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            if ui
-                                .add(
+                            if renaming {
+                                let resp = ui.add(
+                                    egui::TextEdit::singleline(&mut self.rename_tab_text)
+                                        .desired_width(130.0)
+                                        .font(egui::TextStyle::Body),
+                                );
+                                if self.rename_tab_focus {
+                                    resp.request_focus();
+                                    self.rename_tab_focus = false;
+                                }
+                                let enter = ui.input(|x| x.key_pressed(egui::Key::Enter));
+                                let esc = ui.input(|x| x.key_pressed(egui::Key::Escape));
+                                if enter || resp.lost_focus() {
+                                    commit_rename = Some((i, self.rename_tab_text.clone()));
+                                }
+                                if esc {
+                                    cancel_rename = true;
+                                }
+                            } else {
+                                let resp = ui.add(
                                     egui::Button::new(
                                         RichText::new(&title).color(tc).size(12.5).strong(),
                                     )
                                     .frame(false),
-                                )
-                                .clicked()
-                            {
-                                select = Some(i);
+                                );
+                                if resp.double_clicked() {
+                                    select = Some(i);
+                                    start_rename = Some((i, title.clone()));
+                                } else if resp.clicked() {
+                                    if active {
+                                        // 点击当前标签标题 → 进入重命名
+                                        start_rename = Some((i, title.clone()));
+                                    } else {
+                                        select = Some(i);
+                                    }
+                                }
                             }
                             if ui
                                 .add(
@@ -3707,12 +3813,30 @@ impl GuiApp {
         if let Some(i) = select {
             self.active = i;
         }
+        if let Some((i, t)) = start_rename {
+            self.renaming_tab = Some(i);
+            self.rename_tab_text = t;
+            self.rename_tab_focus = true;
+        }
+        if let Some((i, t)) = commit_rename {
+            let t = t.trim().to_string();
+            if !t.is_empty() && i < self.tabs.len() {
+                self.tabs[i].title = t;
+            }
+            self.renaming_tab = None;
+        }
+        if cancel_rename {
+            self.renaming_tab = None;
+        }
         if let Some(i) = close {
             if self.tabs.len() > 1 {
                 self.pending_delete = Some(PendingDelete::Tab {
                     idx: i,
                     title: self.tabs[i].title.clone(),
                 });
+            }
+            if self.renaming_tab == Some(i) {
+                self.renaming_tab = None;
             }
         }
         if add {
@@ -3763,30 +3887,34 @@ impl GuiApp {
                 tab.params = parse_query(&tab.url);
                 tab.path_rows = detect_path_vars(&tab.url);
             }
-            if ui
-                .add(
-                    egui::Button::new(RichText::new("cURL").color(brand()).strong())
-                        .fill(brand_soft())
-                        .rounding(Rounding::same(R_MD))
-                        .min_size(egui::vec2(56.0, 32.0)),
-                )
-                .on_hover_text("复制当前请求为 cURL 命令")
-                .clicked()
-            {
+            // 把「复制 / 导出 / 导入」等 cURL 相关操作收拢到一个下拉菜单，点击 cURL 按钮即可使用。
+            let mut curl_copy = false;
+            let mut curl_export = false;
+            let mut curl_import = false;
+            let curl_resp = ui
+                .menu_button(RichText::new("cURL").color(brand()).strong(), |ui| {
+                    ui.set_min_width(190.0);
+                    if ui.button("复制当前请求为 cURL").clicked() {
+                        curl_copy = true;
+                        ui.close_menu();
+                    }
+                    if ui.button("导出为 cURL 脚本文件…").clicked() {
+                        curl_export = true;
+                        ui.close_menu();
+                    }
+                    ui.separator();
+                    if ui.button("从 cURL 导入（粘贴）…").clicked() {
+                        curl_import = true;
+                        ui.close_menu();
+                    }
+                });
+            curl_resp.response.on_hover_text("cURL：复制 / 导出 / 导入");
+            if curl_copy {
                 let code = codegen::generate(&tab.build_request(), "curl").unwrap_or_default();
                 ui.output_mut(|o| o.copied_text = code);
                 tab.status = "已复制 cURL 到剪贴板".into();
             }
-            if ui
-                .add(
-                    egui::Button::new(RichText::new("导出").color(brand()).strong())
-                        .fill(brand_soft())
-                        .rounding(Rounding::same(R_MD))
-                        .min_size(egui::vec2(56.0, 32.0)),
-                )
-                .on_hover_text("把当前请求导出为 cURL 脚本文件（~/.postman-rs/exports/）")
-                .clicked()
-            {
+            if curl_export {
                 let code = codegen::generate(&tab.build_request(), "curl").unwrap_or_default();
                 let dir = storage::home().join("exports");
                 let _ = std::fs::create_dir_all(&dir);
@@ -3798,6 +3926,9 @@ impl GuiApp {
                     Ok(_) => tab.status = format!("已导出 cURL → {}", path.display()),
                     Err(e) => tab.status = format!("导出失败：{}", e),
                 }
+            }
+            if curl_import {
+                self.curl_import_open = true;
             }
             let label = if tab.inflight { "发送中…" } else { "发送" };
             if ui
@@ -5096,6 +5227,7 @@ impl eframe::App for GuiApp {
         self.ui_main(ctx);
         self.show_new_request_dialog(ctx);
         self.show_confirm_dialog(ctx);
+        self.show_curl_import_dialog(ctx);
     }
 }
 // ---------------------------------------------------------------------------
