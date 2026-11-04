@@ -337,7 +337,11 @@ postman-rs/
 ├─ tests/integration.rs
 ├─ examples/           # demo collection / environment / sample.curl
 ├─ scripts/build-macos.sh
-├─ .github/workflows/build.yml   # Windows / macOS / Linux 三平台 CI
+├─ docs/               # 逆向分析、功能矩阵、Rust 复刻架构与验收文档（见 docs/README.md）
+├─ .github/            # Issue 模板与 CI / build / Docker 工作流
+├─ Dockerfile          # 容器镜像（pmrs CLI）
+├─ .editorconfig / .gitattributes / rustfmt.toml    # 代码风格与换行统一
+├─ CONTRIBUTING.md / SECURITY.md / CODE_OF_CONDUCT.md
 └─ dist/               # 预编译产物（git 忽略）
 ```
 
