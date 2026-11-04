@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        使用 / 配置类疑问，请先查看 [README](https://github.com/zhouyulong123/postman-rs/blob/main/README.md) 与 [使用反馈指南](https://github.com/zhouyulong123/postman-rs/blob/main/docs/FEEDBACK.md)。
+        使用 / 配置类疑问，请先查看 [README](https://github.com/shuying-code/postman-rs/blob/main/README.md) 与 [使用反馈指南](https://github.com/shuying-code/postman-rs/blob/main/docs/FEEDBACK.md)。
 
         > 维护者通常**每周集中处理一次**。如果是可复现的 Bug，请改用「Bug / 问题反馈」模板。
 

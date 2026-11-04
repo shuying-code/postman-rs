@@ -9,7 +9,7 @@ body:
         感谢反馈！请尽量把信息填完整——**可复现的最小步骤与样例**能大幅加快定位和修复。
 
         > 维护者通常**每周集中处理 / 回复一次** issue（约每周更新）。请勿重复提交同一问题。
-        > 提交前请先阅读 [使用反馈指南](https://github.com/zhouyulong123/postman-rs/blob/main/docs/FEEDBACK.md)。
+        > 提交前请先阅读 [使用反馈指南](https://github.com/shuying-code/postman-rs/blob/main/docs/FEEDBACK.md)。
 
   - type: input
     id: version
